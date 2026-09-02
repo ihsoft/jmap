@@ -1006,7 +1006,20 @@ pub async fn read_prop_type(ptr: &Ptr<ZProperty>) -> Result<Property> {
         }
     } else if f.contains(EClassCastFlags::CASTCLASS_FObjectProperty) {
         let prop = ptr.cast::<ZObjectProperty>();
-        let property_class = prop.property_class().read().await?.path().await?;
+        let property_class = if let Some(property_class) = prop
+            .property_class()
+            .cast::<Option<Ptr<UClass>>>()
+            .read()
+            .await?
+        {
+            property_class.path().await?
+        } else {
+            crate::warn!(
+                "object property {name} at {:#x} has no property class",
+                ptr.address()
+            );
+            String::new()
+        };
         PropertyType::Object { property_class }
     } else if f.contains(EClassCastFlags::CASTCLASS_FSoftClassProperty) {
         let prop = ptr.cast::<ZSoftClassProperty>();
@@ -1036,7 +1049,15 @@ pub async fn read_prop_type(ptr: &Ptr<ZProperty>) -> Result<Property> {
         PropertyType::LazyObject { property_class: c }
     } else if f.contains(EClassCastFlags::CASTCLASS_FInterfaceProperty) {
         let prop = ptr.cast::<ZInterfaceProperty>();
-        let interface_class = prop.interface_class().read().await?.path().await?;
+        let interface_class = if let Some(interface_class) = prop.interface_class().read().await? {
+            interface_class.path().await?
+        } else {
+            crate::warn!(
+                "interface property {name} at {:#x} has no interface class",
+                ptr.address()
+            );
+            String::new()
+        };
         PropertyType::Interface { interface_class }
     } else if f.contains(EClassCastFlags::CASTCLASS_FFieldPathProperty) {
         // TODO
@@ -1173,12 +1194,15 @@ pub async fn read_prop(
             PropertyValue::UInt64(v) => v as i64,
             e => bail!("underlying enum prop {e:?}"),
         };
-        let names = read_enum(&prop.enum_().read().await?.expect("valid enum"))
-            .await?
-            .names;
-        let name = names
-            .into_iter()
-            .find_map(|(name, v)| (v == value).then_some(name));
+        let name = if let Some(enum_) = prop.enum_().read().await? {
+            read_enum(&enum_)
+                .await?
+                .names
+                .into_iter()
+                .find_map(|(name, v)| (v == value).then_some(name))
+        } else {
+            None
+        };
 
         PropertyValue::Enum(if let Some(name) = name {
             EnumPropertyValue::Name(name)

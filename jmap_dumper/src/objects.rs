@@ -659,7 +659,7 @@ impl Ptr<ZLazyObjectProperty> {
 #[derive(Clone, Copy)]
 pub struct ZInterfaceProperty;
 impl Ptr<ZInterfaceProperty> {
-    pub fn interface_class(&self) -> Ptr<Ptr<UClass>> {
+    pub fn interface_class(&self) -> Ptr<Option<Ptr<UClass>>> {
         let offset = self
             .ctx()
             .struct_member("ZInterfaceProperty", "InterfaceClass");
