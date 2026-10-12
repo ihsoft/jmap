@@ -1030,14 +1030,40 @@ pub async fn read_prop_type(ptr: &Ptr<ZProperty>) -> Result<Property> {
             .await?
             .path()
             .await?;
-        let meta_class = prop.meta_class().read().await?.path().await?;
+        let meta_class = if let Some(meta_class) = prop
+            .meta_class()
+            .cast::<Option<Ptr<UClass>>>()
+            .read()
+            .await?
+        {
+            meta_class.path().await?
+        } else {
+            crate::warn!(
+                "soft class property {name} at {:#x} has no meta class",
+                ptr.address()
+            );
+            String::new()
+        };
         PropertyType::SoftClass {
             property_class,
             meta_class,
         }
     } else if f.contains(EClassCastFlags::CASTCLASS_FSoftObjectProperty) {
         let prop = ptr.cast::<ZSoftObjectProperty>();
-        let property_class = prop.property_class().read().await?.path().await?;
+        let property_class = if let Some(property_class) = prop
+            .property_class()
+            .cast::<Option<Ptr<UClass>>>()
+            .read()
+            .await?
+        {
+            property_class.path().await?
+        } else {
+            crate::warn!(
+                "soft object property {name} at {:#x} has no property class",
+                ptr.address()
+            );
+            String::new()
+        };
         PropertyType::SoftObject { property_class }
     } else if f.contains(EClassCastFlags::CASTCLASS_FWeakObjectProperty) {
         let prop = ptr.cast::<ZWeakObjectProperty>();
